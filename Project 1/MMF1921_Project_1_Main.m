@@ -102,7 +102,7 @@ currentVal = zeros(NoPeriods, NoModels);
 % Set the value of lambda and K for the LASSO and BSS models, respectively
 %--------------------------------------------------------------------------
 lambda = 0.029;
-K      = 4;
+K      = 9;
 
 for t = 1 : NoPeriods
   

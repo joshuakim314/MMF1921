@@ -10,8 +10,8 @@ function  [mu, Q, B, errors] = BSS(returns, factRet, lambda, K)
     % *************** WRITE YOUR CODE HERE ***************
     %----------------------------------------------------------------------
     % for sufficiently large bound (subject to change) 
-    lb = -30; 
-    ub = 30; 
+    lb = -100; 
+    ub = 100; 
     
     [T,p] = size(factRet);
     N = size(returns,2);
@@ -37,7 +37,7 @@ function  [mu, Q, B, errors] = BSS(returns, factRet, lambda, K)
         % f(x) = (1/2) x' H x + c' x 
 
         % Define the Q matrix in the objective 
-        model.Q = sparse(2*Q);
+        model.Q = sparse(Q);
 
         % define the c vector in the objective (which is a vector of zeros since
         % there is no linear term in our objective)
@@ -53,6 +53,10 @@ function  [mu, Q, B, errors] = BSS(returns, factRet, lambda, K)
 
         % Indicate whether the constraints are ">=", "<=", or "="
         model.sense = repmat('<', (2*(p+1) + 1), 1);
+        
+        % bounds
+        model.lb = [(ones(1, p+1) * lb) zeros(1, p+1)];
+        model.ub = [(ones(1, p+1) * ub) ones(1, p+1)];
 
         % Define the variable type (continuous, integer, or binary)
         model.vtype = varTypes;
@@ -67,7 +71,6 @@ function  [mu, Q, B, errors] = BSS(returns, factRet, lambda, K)
         B_y(:,i) = results.x;
 
     end
-    
     B = B_y(1:p+1,:);
     
     errors = returns - X*B;
