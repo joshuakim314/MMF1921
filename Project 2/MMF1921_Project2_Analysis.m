@@ -91,8 +91,8 @@ NoSims = 10000;
 alpha = 0.95;
 
 % Factor models: OLS, LASSO, BSS, PCA
-% FMList = {'OLS' 'LASSO' 'BSS' 'PCA'};
-FMList = {'OLS' 'LASSO' 'PCA'};  % without gurobi
+FMList = {'OLS' 'LASSO' 'BSS' 'PCA'};
+% FMList = {'OLS' 'LASSO' 'PCA'};  % without gurobi
 FMList = cellfun(@str2func, FMList, 'UniformOutput', false);
 NoFactorModels = length(FMList);
 
@@ -108,7 +108,14 @@ optList  = cellfun(@str2func, optList, 'UniformOutput', false);
 NoModels = length(optList);
 
 % Tags for the portfolios under the different formulations
-tags = {'MVO' 'CVaR' 'Risk parity' 'Max SR'};
+tags = {'MVO' 'CVaR' 'RP' 'MaxSR'};
+
+% Tags for pairs of factor models and optimization models
+for i = 1 : NoFactorModels
+    for j = 1 : NoModels
+        Pairtags{(i-1)*NoModels + j} = append(FMtags{i},' + ',tags{j});
+    end
+end
 
 % Preallocate space for the portfolio weights (x0 will be used to calculate
 % the turnover rate)
@@ -225,20 +232,22 @@ toc
 %--------------------------------------------------------------------------
 
 % Calculate the observed portfolio returns
-portfRets = portfValue(2:end) ./ portfValue(1:end-1) - 1;
+portfRets = portfValue(:, 2:end) ./ portfValue(:, 1:end-1) - 1;
 
 % Calculate the portfolio excess returns
-portfExRets = portfRets - table2array(riskFree(dates >= datetime(returns.Properties.RowNames{1}) + calyears(5) + calmonths(1),: ));
+portfExRets = portfRets' - table2array(riskFree(dates >= datetime(returns.Properties.RowNames{1}) + calyears(5) + calmonths(1),: ));
 
 % Calculate the portfolio Sharpe ratio 
-SR = (geomean(portfExRets + 1) - 1) / std(portfExRets);
+SR = (geomean(portfExRets + 1) - 1) ./ std(portfExRets);
 
 % Calculate the average turnover rate
-avgTurnover = mean(turnover(2:end));
+avgTurnover = mean(turnover(2:end, :));
 
 % Print Sharpe ratio and Avg. turnover to the console
-disp(['Sharpe ratio: ', num2str(SR)]);
-disp(['Avg. turnover: ', num2str(avgTurnover)]);
+disp(['Sharpe ratio: [' num2str(SR(:).') ']']) ;
+disp(['Sharpe ratio: [' num2str(avgTurnover(:).') ']']) ;
+% disp(['Sharpe ratio: ', num2str(SR)]);
+% disp(['Avg. turnover: ', num2str(avgTurnover)]);
 
 %--------------------------------------------------------------------------
 % 3.2 Portfolio wealth evolution plot
@@ -248,8 +257,17 @@ disp(['Avg. turnover: ', num2str(avgTurnover)]);
 plotDates = dates(dates >= datetime(returns.Properties.RowNames{1}) + calyears(5) );
 
 fig1 = figure(1);
-plot(plotDates, portfValue)
+% plot(plotDates, portfValue)
 
+for i = 1 : NoFactorModels
+    for j = 1 : NoModels
+        ij = (i-1)*NoModels + j;
+        plot(plotDates, portfValue(ij,:))
+        hold on
+    end
+end
+
+legend(Pairtags, 'Location', 'eastoutside','FontSize',12);
 datetick('x','dd-mmm-yyyy','keepticks','keeplimits');
 set(gca,'XTickLabelRotation',30);
 title('Portfolio wealth evolution', 'FontSize', 14)
@@ -265,31 +283,56 @@ set(fig1,'PaperPositionMode','Auto','PaperUnits','Inches',...
 % print(fig1,'fileName','-dpdf','-r0');
 
 % If you want to save the figure as .png for use in MS Word
-print(fig1,'fileName','-dpng','-r0');
+print(fig1,'figures/wealth_evolution','-dpng','-r0');
 
 %--------------------------------------------------------------------------
 % 3.3 Portfolio weights plot
 %--------------------------------------------------------------------------
 
-% Portfolio weights
-fig2 = figure(2);
-area(x')
-legend(tickers, 'Location', 'eastoutside','FontSize',12);
-title('Portfolio weights', 'FontSize', 14)
-ylabel('Weights','interpreter','latex','FontSize',12);
-xlabel('Rebalance period','interpreter','latex','FontSize',12);
+for i = 1 : NoFactorModels
+    for j = 1 : NoModels
+        ij = (i-1)*NoModels + j;
+        % Portfolio weights
+        fig2 = figure(2);
+        area(x{ij}')
+        legend(tickers, 'Location', 'eastoutside','FontSize',12);
+        title(append(Pairtags{ij},' Portfolio weights'), 'FontSize', 14)
+        ylabel('Weights','interpreter','latex','FontSize',12);
+        xlabel('Rebalance period','interpreter','latex','FontSize',12);
+        
+        % Define the plot size in inches
+        set(fig2,'Units','Inches', 'Position', [0 0 8, 5]);
+        pos1 = get(fig2,'Position');
+        set(fig2,'PaperPositionMode','Auto','PaperUnits','Inches',...
+            'PaperSize',[pos1(3), pos1(4)]);
+        
+        % If you want to save the figure as .pdf for use in LaTeX
+        % print(fig2,'fileName2','-dpdf','-r0');
+        
+        % If you want to save the figure as .png for use in MS Word
+        print(fig2,append('figures/',Pairtags{ij},' Composition'),'-dpng','-r0');
+    end
+end
 
-% Define the plot size in inches
-set(fig2,'Units','Inches', 'Position', [0 0 8, 5]);
-pos1 = get(fig2,'Position');
-set(fig2,'PaperPositionMode','Auto','PaperUnits','Inches',...
-    'PaperSize',[pos1(3), pos1(4)]);
-
-% If you want to save the figure as .pdf for use in LaTeX
-% print(fig2,'fileName2','-dpdf','-r0');
-
-% If you want to save the figure as .png for use in MS Word
-print(fig2,'fileName2','-dpng','-r0');
+% % Portfolio weights
+% fig2 = figure(2);
+% area(x')
+% legend(tickers, 'Location', 'eastoutside','FontSize',12);
+% title('Portfolio weights', 'FontSize', 14)
+% ylabel('Weights','interpreter','latex','FontSize',12);
+% xlabel('Rebalance period','interpreter','latex','FontSize',12);
+% 
+% % Define the plot size in inches
+% set(fig2,'Units','Inches', 'Position', [0 0 8, 5]);
+% pos1 = get(fig2,'Position');
+% set(fig2,'PaperPositionMode','Auto','PaperUnits','Inches',...
+%     'PaperSize',[pos1(3), pos1(4)]);
+% 
+% % If you want to save the figure as .pdf for use in LaTeX
+% % print(fig2,'fileName2','-dpdf','-r0');
+% 
+% % If you want to save the figure as .png for use in MS Word
+% print(fig2,'fileName2','-dpng','-r0');
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Program End
