@@ -20,8 +20,8 @@ format short
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Input file names
-assetData  = 'MMF1921_AssetPrices_1.csv';
-factorData = 'MMF1921_FactorReturns_1.csv';
+assetData  = 'MMF1921_AssetPrices_2.csv';
+factorData = 'MMF1921_FactorReturns_2.csv';
 
 % Initial budget to invest ($100,000)
 initialVal = 100000;

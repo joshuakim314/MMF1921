@@ -11,13 +11,13 @@ for lambda = linspace(0.02,0.035,nn)
     i = i + 1;
 
     % Load the stock weekly prices
-    adjClose = readtable('MMF1921_AssetPrices.csv');
+    adjClose = readtable('MMF1921_AssetPrices_1.csv');
     adjClose.Properties.RowNames = cellstr(datetime(adjClose.Date));
     adjClose.Properties.RowNames = cellstr(datetime(adjClose.Properties.RowNames));
     adjClose.Date = [];
 
     % Load the factors weekly returns
-    factorRet = readtable('MMF1921_FactorReturns.csv');
+    factorRet = readtable('MMF1921_FactorReturns_1.csv');
     factorRet.Properties.RowNames = cellstr(datetime(factorRet.Date));
     factorRet.Properties.RowNames = cellstr(datetime(factorRet.Properties.RowNames));
     factorRet.Date = [];

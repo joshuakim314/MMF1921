@@ -20,8 +20,8 @@ format short
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Input file names
-assetData  = 'MMF1921_AssetPrices_1.csv';
-factorData = 'MMF1921_FactorReturns_1.csv';
+assetData  = 'MMF1921_AssetPrices_3.csv';
+factorData = 'MMF1921_FactorReturns_3.csv';
 
 % Initial budget to invest ($100,000)
 initialVal = 100000;
@@ -86,9 +86,9 @@ n = size(adjClose,2);
 
 % parameters
 lambda = 0.03;
-K = 4;
+K = 5;
 NoSims = 10000;
-alpha = 0.95;
+% alpha = 0.95;
 
 % Factor models: OLS, LASSO, BSS, PCA
 FMList = {'OLS' 'LASSO' 'BSS' 'PCA'};
@@ -117,10 +117,8 @@ for i = 1 : NoFactorModels
     end
 end
 
-% Preallocate space for the portfolio weights (x0 will be used to calculate
-% the turnover rate)
-% x  = zeros(NoPeriods, NoFactorModels*NoModels);
-% x0 = zeros(NoPeriods, NoFactorModels*NoModels);
+% for regime detection
+avg_vols = zeros(NoPeriods, 1);
 
 % Preallocate space for the portfolio per period value and turnover
 currentVal = zeros(NoPeriods, NoFactorModels*NoModels);
@@ -140,6 +138,11 @@ for t = 1 : NoPeriods
     periodFactRet = table2array( factorRet( dates <= calEnd, :) );
     currentPrices = table2array( adjClose( ( calEnd - calmonths(1) - days(5) ) <= dates & dates <= calEnd, :) )';
     
+    % regime detection
+    periodQ = cov(periodReturns(end-5:end,:));
+    avg_vol = trace(periodQ) / n;
+    avg_vols(t, 1) = avg_vol;
+
     % Subset the prices corresponding to the current out-of-sample test 
     % period.
     periodPrices = table2array( adjClose( testStart <= dates & dates <= testEnd,:) );
@@ -164,11 +167,27 @@ for t = 1 : NoPeriods
     % You must write code your own algorithmic trading function 
     %----------------------------------------------------------------------
     for i = 1 : NoFactorModels
-        [mu, Q, B, errors, D, V, F] = FMList{i}(periodReturns, periodFactRet, lambda, K);
+        [mu, Q, B, errors, D, V, F] = FMList{i}(periodReturns(end-59:end,:), periodFactRet(end-59:end,:), lambda, K);
+        % if i == 4
+        %     [var_explained(t,:), cumul_var_explained(t,:), H_sw(t,:), H_ad(t,:), S_diff(t,:), K_diff(t,:)] = PCA_analysis(periodReturns(end-59:end,:), 3, t); 
+        % end
+        if i == 1
+            alpha = 0.9;
+            targetRet_percentile = 0.9;
+        elseif i == 2
+            alpha = 0.9;
+            targetRet_percentile = 0.7;
+        elseif i == 3
+            alpha = 0.95;
+            targetRet_percentile = 0.7;
+        elseif i == 4
+            alpha = 0.95;
+            targetRet_percentile = 0.7;
+        end
         for j = 1 : NoModels
             ij = (i-1)*NoModels + j;
             if j == 2
-                targetRet_percentile = 1.0;
+                % targetRet_percentile = 1.0;
                 targetRet = targetRet_percentile * mean(mu);
                 scenarios = MCNorm(mu, D, V, F, NoSims);
                 x{ij}(:, t) = optList{j}(scenarios, mu, targetRet, alpha);
@@ -239,20 +258,25 @@ portfExRets = portfRets' - table2array(riskFree(dates >= datetime(returns.Proper
 
 % Calculate the portfolio Sharpe ratio 
 SR = (geomean(portfExRets + 1) - 1) ./ std(portfExRets);
+% SR = (geomean(portfExRets(42:60,:) + 1) - 1) ./ std(portfExRets(42:60,:));
+% SR = (geomean(cat(1, portfExRets(1:41,:), portfExRets(61:end,:)) + 1) - 1) ./ std(cat(1, portfExRets(1:41,:), portfExRets(61:end,:)));
 
 % Calculate the average turnover rate
 avgTurnover = mean(turnover(2:end, :));
+% avgTurnover = mean(turnover(7:10, :));
+% avgTurnover = mean(cat(1, turnover(1:6,:), turnover(11:end,:)));
 
 % Print Sharpe ratio and Avg. turnover to the console
-disp(['Sharpe ratio: [' num2str(SR(:).') ']']) ;
-disp(['Sharpe ratio: [' num2str(avgTurnover(:).') ']']) ;
+disp(['Sharpe ratio : [' num2str(SR(:).') ']']) ;
+disp(['Avg. turnover: [' num2str(avgTurnover(:).') ']']) ;
+display(0.8*SR - 0.2*avgTurnover)
 % disp(['Sharpe ratio: ', num2str(SR)]);
 % disp(['Avg. turnover: ', num2str(avgTurnover)]);
 
 %--------------------------------------------------------------------------
 % 3.2 Portfolio wealth evolution plot
 %--------------------------------------------------------------------------
-
+%%
 % Calculate the dates of the out-of-sample period
 plotDates = dates(dates >= datetime(returns.Properties.RowNames{1}) + calyears(5) );
 
@@ -268,6 +292,7 @@ for i = 1 : NoFactorModels
 end
 
 legend(Pairtags, 'Location', 'eastoutside','FontSize',12);
+% legend({'CI = 70%' 'CI = 90%' 'CI = 95%' 'CI = 99%'}, 'Location', 'eastoutside','FontSize',12);
 datetick('x','dd-mmm-yyyy','keepticks','keeplimits');
 set(gca,'XTickLabelRotation',30);
 title('Portfolio wealth evolution', 'FontSize', 14)
@@ -288,7 +313,6 @@ print(fig1,'figures/wealth_evolution','-dpng','-r0');
 %--------------------------------------------------------------------------
 % 3.3 Portfolio weights plot
 %--------------------------------------------------------------------------
-
 for i = 1 : NoFactorModels
     for j = 1 : NoModels
         ij = (i-1)*NoModels + j;
